@@ -1,0 +1,15 @@
+[Unit]
+Description=MRO Data Flywheel — daily cleaning + labeling + training sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=zhanjun
+WorkingDirectory=/opt/zero
+Environment="MRO_DB_PATH=/opt/bigdisk/zero/mro-full.db"
+Environment="JARVIS_HOST=10.0.0.100:8000"
+ExecStart=/opt/zero/src/scripts/mro_flywheel_sync.sh
+StandardOutput=journal
+StandardError=journal
+TimeoutSec=3600

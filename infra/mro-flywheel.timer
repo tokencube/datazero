@@ -1,0 +1,11 @@
+[Unit]
+Description=MRO Data Flywheel daily timer
+Requires=mro-flywheel.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=1800
+
+[Install]
+WantedBy=timers.target

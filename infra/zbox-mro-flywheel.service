@@ -1,0 +1,39 @@
+[Unit]
+Description=MRO flywheel runner — long-running 10-min propagate/spec-extract loop
+Documentation=file:///home/zhanjun/zero/src/scripts/mro_flywheel_runner.ts
+After=network-online.target
+Wants=network-online.target
+
+# ── Quality monitoring ──────────────────────────────────────────────────────
+# Data quality + Evidently AI drift tracking runs via a companion systemd timer:
+#   /home/zhanjun/zero/infra/zbox/systemd/mro-quality-history.service + .timer
+# Or manually: ./src/scripts/mro_quality_history.sh
+# Stages: assess → archive → Evidently quality/drift HTML → prune history (keep 30)
+
+[Service]
+Type=simple
+User=zhanjun
+WorkingDirectory=/home/zhanjun/zero
+EnvironmentFile=/home/zhanjun/zero/.env
+Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/bin:/bin
+ExecStart=/home/linuxbrew/.linuxbrew/bin/node /home/zhanjun/zero/node_modules/.bin/tsx /home/zhanjun/zero/src/scripts/mro_flywheel_runner.ts
+# Run quality assessment + Evidently history once on service start:
+ExecStartPost=/home/zhanjun/zero/src/scripts/mro_quality_history.sh
+TimeoutStartSec=300
+Restart=always
+RestartSec=30s
+StandardOutput=append:/var/log/mro-flywheel.log
+StandardError=append:/var/log/mro-flywheel.log
+
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+MemoryMax=2G
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
