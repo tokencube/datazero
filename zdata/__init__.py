@@ -13,6 +13,16 @@ from .format import (
     create_zdata_dataset,
     open_zdata_dataset,
 )
+from .annotations import (
+    ANNOTATION_VERSION,
+    ANNOTATION_TABLES,
+    CUBOIDS_SCHEMA,
+    POLYGONS_SCHEMA,
+    TRAJECTORIES_SCHEMA,
+    TIME_RANGES_SCHEMA,
+    ANNOTATION_RUNS_SCHEMA,
+    create_annotation_tables,
+)
 
 __all__ = [
     "ZDATA_VERSION",
@@ -22,4 +32,12 @@ __all__ = [
     "TOPICS_SCHEMA",
     "create_zdata_dataset",
     "open_zdata_dataset",
+    "ANNOTATION_VERSION",
+    "ANNOTATION_TABLES",
+    "CUBOIDS_SCHEMA",
+    "POLYGONS_SCHEMA",
+    "TRAJECTORIES_SCHEMA",
+    "TIME_RANGES_SCHEMA",
+    "ANNOTATION_RUNS_SCHEMA",
+    "create_annotation_tables",
 ]
