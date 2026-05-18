@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datazero.io/zdata/schemas/annotation_runs.schema.json",
+  "title": "zdata Annotation Runs",
+  "description": "Batch annotation session metadata.",
+  "type": "object",
+  "properties": {
+    "run_id": {"type": "string", "description": "UUID4 primary key"},
+    "mcap_file": {"type": "string"},
+    "annotator": {"type": "string", "description": "human:<email> or model:<name>"},
+    "annotation_types": {"type": "string", "description": "JSON array of types: cuboid, polygon, etc."},
+    "total_annotations": {"type": "integer"},
+    "approved_count": {"type": "integer"},
+    "rejected_count": {"type": "integer"},
+    "started_at": {"type": "string", "format": "date-time"},
+    "completed_at": {"type": "string", "format": "date-time"},
+    "model_version": {"type": ["string", "null"], "description": "AI model version if AI-assisted"}
+  },
+  "required": ["run_id", "mcap_file"]
+}

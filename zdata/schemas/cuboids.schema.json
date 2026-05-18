@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datazero.io/zdata/schemas/cuboids.schema.json",
+  "title": "zdata Cuboid Annotations",
+  "description": "3D bounding box annotations using Foxglove SceneUpdate cube primitives.",
+  "type": "object",
+  "properties": {
+    "annotation_id": {
+      "type": "string",
+      "description": "UUID4 primary key"
+    },
+    "frame_id": {
+      "type": "string",
+      "description": "Foreign key to frames.frame_id"
+    },
+    "mcap_file": {"type": "string"},
+    "mower_id": {"type": "string"},
+    "x": {"type": "number", "description": "Center position X (m)"},
+    "y": {"type": "number", "description": "Center position Y (m)"},
+    "z": {"type": "number", "description": "Center position Z (m)"},
+    "roll_deg": {"type": "number"},
+    "pitch_deg": {"type": "number"},
+    "yaw_deg": {"type": "number"},
+    "size_x": {"type": "number", "description": "Extent X (m)"},
+    "size_y": {"type": "number", "description": "Extent Y (m)"},
+    "size_z": {"type": "number", "description": "Extent Z (m)"},
+    "r": {"type": "number", "description": "Red channel [0, 1]"},
+    "g": {"type": "number", "description": "Green channel [0, 1]"},
+    "b": {"type": "number", "description": "Blue channel [0, 1]"},
+    "a": {"type": "number", "description": "Alpha channel [0, 1]"},
+    "label": {"type": "string", "description": "e.g. obstacle, tree, boundary"},
+    "confidence": {"type": "number", "description": "Model prediction confidence [0, 1]"},
+    "annotator": {"type": "string", "description": "human:<email> or model:<name>"},
+    "review_status": {"type": "string", "enum": ["pending", "approved", "rejected"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "tags": {"type": "string", "description": "JSON array of tag strings"}
+  },
+  "required": ["annotation_id", "frame_id", "mcap_file", "mower_id", "label"]
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datazero.io/zdata/schemas/polygons.schema.json",
+  "title": "zdata Polygon Annotations",
+  "description": "2D image-space polygon segmentation annotations.",
+  "type": "object",
+  "properties": {
+    "annotation_id": {"type": "string", "description": "UUID4 primary key"},
+    "frame_id": {"type": "string", "description": "Foreign key to frames.frame_id"},
+    "mcap_file": {"type": "string"},
+    "mower_id": {"type": "string"},
+    "vertices": {"type": "string", "description": "JSON array of [x, y] pixel coordinates"},
+    "label": {"type": "string", "description": "e.g. grass, obstacle, sky"},
+    "confidence": {"type": "number"},
+    "annotator": {"type": "string"},
+    "review_status": {"type": "string", "enum": ["pending", "approved", "rejected"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "tags": {"type": "string"}
+  },
+  "required": ["annotation_id", "frame_id", "mcap_file", "mower_id", "vertices", "label"]
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datazero.io/zdata/schemas/trajectories.schema.json",
+  "title": "zdata Trajectory Annotations",
+  "description": "Path and waypoint annotations using Foxglove SceneUpdate line primitives.",
+  "type": "object",
+  "properties": {
+    "annotation_id": {"type": "string", "description": "UUID4 primary key"},
+    "mcap_file": {"type": "string"},
+    "mower_id": {"type": "string"},
+    "waypoints": {"type": "string", "description": "JSON array of [x, y, z] world coordinates"},
+    "thickness": {"type": "number", "description": "Line thickness in pixels"},
+    "r": {"type": "number"}, "g": {"type": "number"},
+    "b": {"type": "number"}, "a": {"type": "number"},
+    "label": {"type": "string", "description": "e.g. planned_path, actual_path, boundary"},
+    "confidence": {"type": "number"},
+    "annotator": {"type": "string"},
+    "review_status": {"type": "string", "enum": ["pending", "approved", "rejected"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "tags": {"type": "string"}
+  },
+  "required": ["annotation_id", "mcap_file", "mower_id", "waypoints", "label"]
+}

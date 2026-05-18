@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datazero.io/zdata/schemas/episodes.schema.json",
+  "title": "zdata Episodes Table",
+  "description": "Episode-level metadata — each entry corresponds to one MCAP recording session.",
+  "type": "object",
+  "properties": {
+    "episode_id": {
+      "type": "string",
+      "description": "Primary key: hash of MCAP path + start tick"
+    },
+    "mcap_file": {
+      "type": "string",
+      "description": "Source MCAP file path"
+    },
+    "mcap_size_bytes": {
+      "type": "integer",
+      "description": "Size of the source MCAP file in bytes"
+    },
+    "start_tick": {
+      "type": "integer",
+      "description": "First frame tick"
+    },
+    "end_tick": {
+      "type": "integer",
+      "description": "Last frame tick"
+    },
+    "duration_s": {
+      "type": "number",
+      "description": "Recording duration in seconds"
+    },
+    "mower_count": {
+      "type": "integer",
+      "description": "Number of mowers in this episode"
+    },
+    "total_frames": {
+      "type": "integer",
+      "description": "Total frame count across all mowers"
+    },
+    "topics": {
+      "type": "string",
+      "description": "JSON array of ROS2 topic strings"
+    },
+    "town_map": {
+      "type": ["string", "null"],
+      "description": "CARLA map name (e.g. Town05_Opt) or 'real'"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 recording start time"
+    },
+    "tags": {
+      "type": "string",
+      "description": "JSON array of tag strings"
+    }
+  },
+  "required": ["episode_id", "mcap_file"]
+}

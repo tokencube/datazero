@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datazero.io/zdata/schemas/time_ranges.schema.json",
+  "title": "zdata Time Range Annotations",
+  "description": "Temporal annotations marking events within a time window.",
+  "type": "object",
+  "properties": {
+    "annotation_id": {"type": "string", "description": "UUID4 primary key"},
+    "mcap_file": {"type": "string"},
+    "mower_id": {"type": "string"},
+    "start_tick": {"type": "integer"},
+    "end_tick": {"type": "integer"},
+    "start_timestamp_ns": {"type": "integer"},
+    "end_timestamp_ns": {"type": "integer"},
+    "label": {"type": "string", "description": "e.g. stuck, collision_risk, charging"},
+    "severity": {"type": "string", "enum": ["info", "warn", "critical"]},
+    "annotator": {"type": "string"},
+    "review_status": {"type": "string", "enum": ["pending", "approved", "rejected"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "notes": {"type": "string", "description": "Free-text description"}
+  },
+  "required": ["annotation_id", "mcap_file", "mower_id", "start_tick", "end_tick", "label"]
+}

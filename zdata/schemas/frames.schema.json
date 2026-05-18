@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://datazero.io/zdata/schemas/frames.schema.json",
+  "title": "zdata Frames Table",
+  "description": "Per-tick aligned frames — image, odometry, and action data for each mower at each tick.",
+  "type": "object",
+  "properties": {
+    "frame_id": {
+      "type": "string",
+      "description": "Primary key: {mcap_hash}:{mower_id}:{tick}"
+    },
+    "mcap_file": {
+      "type": "string",
+      "description": "Source MCAP file name"
+    },
+    "mower_id": {
+      "type": "string",
+      "description": "Robot identifier (e.g. mower-01)"
+    },
+    "tick": {
+      "type": "integer",
+      "description": "Frame tick counter within the MCAP file"
+    },
+    "timestamp_ns": {
+      "type": "integer",
+      "description": "Nanosecond-precision timestamp"
+    },
+    "x": {"type": "number", "description": "Position X (m), world frame"},
+    "y": {"type": "number", "description": "Position Y (m), world frame"},
+    "z": {"type": "number", "description": "Position Z (m), world frame"},
+    "roll_deg": {"type": "number", "description": "Roll angle (degrees)"},
+    "pitch_deg": {"type": "number", "description": "Pitch angle (degrees)"},
+    "yaw_deg": {"type": "number", "description": "Yaw angle (degrees)"},
+    "speed_ms": {"type": "number", "description": "Linear speed (m/s)"},
+    "angular_z": {"type": "number", "description": "Angular velocity Z (rad/s)"},
+    "throttle": {"type": "number", "description": "Throttle command [-1, 1]"},
+    "steer": {"type": "number", "description": "Steering command [-1, 1]"},
+    "brake": {"type": "number", "description": "Brake command [0, 1]"},
+    "deck_active": {"type": "boolean", "description": "Whether mower deck is engaged"},
+    "coverage_pct": {"type": "number", "description": "Area coverage percentage"},
+    "image_jpg": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "description": "Raw JPEG image bytes, null if no camera"
+    },
+    "image_w": {"type": ["integer", "null"], "description": "Image width in pixels"},
+    "image_h": {"type": ["integer", "null"], "description": "Image height in pixels"}
+  },
+  "required": ["frame_id", "mcap_file", "mower_id", "tick", "timestamp_ns"]
+}

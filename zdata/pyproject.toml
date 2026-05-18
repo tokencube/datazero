@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zdata"
+version = "1.0.0"
+description = "Open multimodal robotics dataset format — MCAP + LanceDB + Label Studio / LeRobot / ShareGPT"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [{name = "DataZero contributors"}]
+keywords = ["robotics", "mcap", "lancedb", "dataset", "autonomous-driving", "lawn-mower"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pyarrow>=14",
+    "lancedb>=0.10",
+]
+
+[project.optional-dependencies]
+convert = ["mcap>=1.0"]
+all = ["zdata[convert]"]
+
+[project.urls]
+Homepage = "https://github.com/tokencube/datazero"
+Repository = "https://github.com/tokencube/datazero"
+Issues = "https://github.com/tokencube/datazero/issues"
+
+[tool.setuptools.packages.find]
+include = ["zdata*"]
