@@ -23,6 +23,21 @@ from .annotations import (
     ANNOTATION_RUNS_SCHEMA,
     create_annotation_tables,
 )
+from .torch_dataset import ZdataDataset
+from .logger import (
+    ZdataLogger,
+    ZdataQuery,
+    Points3D,
+    Boxes3D,
+    Scalars,
+    Image,
+    TextLog,
+    init,
+    log,
+    set_frame_idx,
+    flush,
+    query,
+)
 
 __all__ = [
     "ZDATA_VERSION",
@@ -40,4 +55,17 @@ __all__ = [
     "TIME_RANGES_SCHEMA",
     "ANNOTATION_RUNS_SCHEMA",
     "create_annotation_tables",
+    "ZdataDataset",
+    "ZdataLogger",
+    "ZdataQuery",
+    "Points3D",
+    "Boxes3D",
+    "Scalars",
+    "Image",
+    "TextLog",
+    "init",
+    "log",
+    "set_frame_idx",
+    "flush",
+    "query",
 ]

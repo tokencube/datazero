@@ -31,6 +31,45 @@ dataset_name/
 pip install zdata
 ```
 
+### Python SDK (Rerun-compatible API)
+
+```python
+import zdata
+
+# Initialize dataset
+zdata.init("my_dataset")
+
+# Log 3D point cloud
+zdata.log("lidar/points", zdata.Points3D(
+    positions=[[1.0, 2.0, 0.0], [3.0, 4.0, 0.1]],
+    colors=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+    labels=["ground", "tree"],
+))
+
+# Log 3D bounding boxes
+zdata.log("objects", zdata.Boxes3D(
+    centers=[[10.0, 20.0, 1.0]],
+    sizes=[[4.0, 2.0, 1.5]],
+    labels=["car"],
+    confidences=[0.95],
+))
+
+# Log time-series scalars
+zdata.log("metrics/speed", zdata.Scalars([0.5, 0.6, 0.55]))
+
+# Log images
+zdata.log("camera/front", zdata.Image(data=jpeg_bytes, format="jpeg",
+                                       width=640, height=480))
+
+zdata.flush()
+
+# Query logged data
+df = zdata.query("my_dataset").entity("lidar/points").to_pandas()
+tensors = zdata.query("my_dataset").to_torch()
+```
+
+### Low-level API (format + schemas)
+
 ```python
 import zdata
 
@@ -47,6 +86,21 @@ db.create_table("frames", schema=zdata.FRAMES_SCHEMA)
 
 # Create annotation tables
 zdata.create_annotation_tables("my_dataset/lance")
+```
+
+### PyTorch DataLoader
+
+```python
+from zdata import ZdataDataset
+from torch.utils.data import DataLoader
+
+ds = ZdataDataset("my_dataset/lance", columns=["x", "y", "throttle", "steer"])
+train, val = ds.train_val_split(val_frac=0.2, seed=42)
+loader = DataLoader(train, batch_size=32, shuffle=True)
+
+for batch in loader:
+    # batch["x"] shape: (32,)
+    ...
 ```
 
 ## Tables
