@@ -31,34 +31,133 @@ from typing import Optional, Sequence
 
 import pyarrow as pa
 
+# Sentinel for from_fields() — distinguishes "unset" from explicitly None
+_PENDING = object()
+
 
 # ── Logging primitives (mirror Rerun archetypes) ──────────────────────
 
 @dataclass
 class Points3D:
-    """3D point cloud with optional colors and labels."""
+    """3D point cloud with optional colors and labels.
+
+    Partial updates via from_fields() — update specific fields without re-logging
+    positions. The query layer (fill_latest_at) merges partial rows.
+    """
     positions: list[list[float]]  # [[x,y,z], ...]
     colors: Optional[list[list[float]]] = None  # [[r,g,b], ...] 0-1
     labels: Optional[list[str]] = None
     intensities: Optional[list[float]] = None
+    _partial: bool = field(default=False, repr=False)
 
     def __post_init__(self):
-        n = len(self.positions)
+        if self.positions is _PENDING:
+            object.__setattr__(self, 'positions', [])  # unset → empty, no validation needed
+            return
+        n = len(self.positions) if self.positions else 0
+        if n == 0:
+            return  # from_fields() partial update — no positions to validate
         if self.colors is not None and len(self.colors) != n:
             raise ValueError(f"colors length {len(self.colors)} != positions {n}")
         if self.labels is not None and len(self.labels) != n:
             raise ValueError(f"labels length {len(self.labels)} != positions {n}")
 
+    @classmethod
+    def from_fields(
+        cls,
+        *,
+        positions: Optional[list[list[float]]] = None,
+        colors: Optional[list[list[float]]] = None,
+        labels: Optional[list[str]] = None,
+        intensities: Optional[list[float]] = None,
+        clear_unset: bool = True,
+    ) -> "Points3D":
+        """Create a partial Points3D update — only specified fields are written.
+
+        Mirrors Rerun's rr.Points3D.from_fields(). When clear_unset=True (default),
+        unspecified fields are explicitly NULL so prior values are cleared.
+        When clear_unset=False, unspecified fields are omitted entirely.
+
+        Usage:
+            # Update only colors for existing points
+            zdata.log("lidar", Points3D.from_fields(colors=new_colors))
+
+            # Keep existing colors, only add labels
+            zdata.log("lidar", Points3D.from_fields(clear_unset=False, labels=new_labels))
+        """
+        # Use _PENDING sentinel so __post_init__ can distinguish "unset" from "empty list"
+        p = positions if positions is not None else _PENDING
+        return cls(
+            positions=p,
+            colors=colors,
+            labels=labels,
+            intensities=intensities,
+            _partial=True,
+        )
+
 
 @dataclass
 class Boxes3D:
-    """3D bounding boxes with pose, size, labels."""
+    """3D bounding boxes with pose, size, labels.
+
+    Partial updates via from_fields() — update specific fields without re-logging
+    everything. The query layer (fill_latest_at) merges partial rows.
+    """
     centers: list[list[float]]   # [[x,y,z], ...]
     sizes: list[list[float]]     # [[sx,sy,sz], ...]
     rotations: Optional[list[list[float]]] = None  # [[roll,pitch,yaw], ...] degrees
     labels: Optional[list[str]] = None
     colors: Optional[list[list[float]]] = None
     confidences: Optional[list[float]] = None
+    _partial: bool = field(default=False, repr=False)
+
+    def __post_init__(self):
+        if self.centers is _PENDING:
+            object.__setattr__(self, 'centers', [])
+            return
+        n = len(self.centers) if self.centers else 0
+        if n == 0:
+            return
+        if self.sizes is not None and len(self.sizes) != n:
+            raise ValueError(f"sizes length {len(self.sizes)} != centers {n}")
+        if self.rotations is not None and len(self.rotations) != n:
+            raise ValueError(f"rotations length {len(self.rotations)} != centers {n}")
+        if self.labels is not None and len(self.labels) != n:
+            raise ValueError(f"labels length {len(self.labels)} != centers {n}")
+
+    @classmethod
+    def from_fields(
+        cls,
+        *,
+        centers: Optional[list[list[float]]] = None,
+        sizes: Optional[list[list[float]]] = None,
+        rotations: Optional[list[list[float]]] = None,
+        labels: Optional[list[str]] = None,
+        colors: Optional[list[list[float]]] = None,
+        confidences: Optional[list[float]] = None,
+        clear_unset: bool = True,
+    ) -> "Boxes3D":
+        """Create a partial Boxes3D update — only specified fields are written.
+
+        Mirrors Rerun's rr.Boxes3D.from_fields(). When clear_unset=True (default),
+        unspecified fields are explicitly NULL so prior values are cleared.
+        When clear_unset=False, unspecified fields are omitted entirely.
+
+        Usage:
+            # Update only labels for existing boxes
+            zdata.log("objects", Boxes3D.from_fields(labels=new_labels))
+        """
+        c = centers if centers is not None else _PENDING
+        s = sizes if sizes is not None else _PENDING
+        return cls(
+            centers=c,
+            sizes=s,
+            rotations=rotations,
+            labels=labels,
+            colors=colors,
+            confidences=confidences,
+            _partial=True,
+        )
 
 
 @dataclass
@@ -208,51 +307,106 @@ class ZdataLogger:
             raise TypeError(f"Unsupported entity type: {type(entity).__name__}")
 
     def _log_points(self, path: str, p: Points3D, ts: int):
-        n = len(p.positions)
-        for i in range(n):
-            x, y, z = p.positions[i]
-            row = {
-                "point_id": str(uuid.uuid4()),
-                "entity_path": path,
-                "frame_idx": self._frame_idx,
-                "timestamp_ns": ts,
-                "x": float(x), "y": float(y), "z": float(z),
-                "r": float(p.colors[i][0]) if p.colors else None,
-                "g": float(p.colors[i][1]) if p.colors else None,
-                "b": float(p.colors[i][2]) if p.colors else None,
-                "intensity": float(p.intensities[i]) if p.intensities else None,
-                "label": p.labels[i] if p.labels else None,
-            }
-            self._pending_points.append(row)
+        if p._partial:
+            # Partial update: determine row count from specified fields
+            n = max(
+                len(p.colors) if p.colors else 0,
+                len(p.labels) if p.labels else 0,
+                len(p.intensities) if p.intensities else 0,
+            )
+            for i in range(n):
+                row = {
+                    "point_id": str(uuid.uuid4()),
+                    "entity_path": path,
+                    "frame_idx": self._frame_idx,
+                    "timestamp_ns": ts,
+                    "x": None, "y": None, "z": None,
+                    "r": float(p.colors[i][0]) if p.colors else None,
+                    "g": float(p.colors[i][1]) if p.colors else None,
+                    "b": float(p.colors[i][2]) if p.colors else None,
+                    "intensity": float(p.intensities[i]) if p.intensities else None,
+                    "label": p.labels[i] if p.labels else None,
+                }
+                self._pending_points.append(row)
+        else:
+            n = len(p.positions)
+            for i in range(n):
+                x, y, z = p.positions[i]
+                row = {
+                    "point_id": str(uuid.uuid4()),
+                    "entity_path": path,
+                    "frame_idx": self._frame_idx,
+                    "timestamp_ns": ts,
+                    "x": float(x), "y": float(y), "z": float(z),
+                    "r": float(p.colors[i][0]) if p.colors else None,
+                    "g": float(p.colors[i][1]) if p.colors else None,
+                    "b": float(p.colors[i][2]) if p.colors else None,
+                    "intensity": float(p.intensities[i]) if p.intensities else None,
+                    "label": p.labels[i] if p.labels else None,
+                }
+                self._pending_points.append(row)
         if len(self._pending_points) >= self._flush_size:
             self._flush_table("points3d", self._pending_points, _points3d_schema())
             self._pending_points.clear()
 
     def _log_boxes(self, path: str, b: Boxes3D, ts: int):
-        n = len(b.centers)
-        for i in range(n):
-            cx, cy, cz = b.centers[i]
-            sx, sy, sz = b.sizes[i]
-            rot = b.rotations[i] if b.rotations else [0.0, 0.0, 0.0]
-            color = b.colors[i] if b.colors else [1.0, 0.0, 0.0, 1.0]
-            row = {
-                "annotation_id": str(uuid.uuid4()),
-                "frame_id": f"log:{self._frame_idx}",
-                "mcap_file": "",
-                "mower_id": "",
-                "x": float(cx), "y": float(cy), "z": float(cz),
-                "roll_deg": float(rot[0]), "pitch_deg": float(rot[1]), "yaw_deg": float(rot[2]),
-                "size_x": float(sx), "size_y": float(sy), "size_z": float(sz),
-                "r": float(color[0]), "g": float(color[1]),
-                "b": float(color[2]), "a": float(color[3]) if len(color) > 3 else 1.0,
-                "label": b.labels[i] if b.labels else "object",
-                "confidence": float(b.confidences[i]) if b.confidences else 1.0,
-                "annotator": "model:zdata-logger",
-                "review_status": "pending",
-                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "tags": "[]",
-            }
-            self._pending_boxes.append(row)
+        if b._partial:
+            n = max(
+                len(b.labels) if b.labels else 0,
+                len(b.colors) if b.colors else 0,
+                len(b.confidences) if b.confidences else 0,
+                len(b.rotations) if b.rotations else 0,
+            )
+            for i in range(n):
+                rot = b.rotations[i] if b.rotations else None
+                color = b.colors[i] if b.colors else None
+                row = {
+                    "annotation_id": str(uuid.uuid4()),
+                    "frame_id": f"log:{self._frame_idx}",
+                    "mcap_file": "",
+                    "mower_id": "",
+                    "x": None, "y": None, "z": None,
+                    "roll_deg": float(rot[0]) if rot else None,
+                    "pitch_deg": float(rot[1]) if rot else None,
+                    "yaw_deg": float(rot[2]) if rot else None,
+                    "size_x": None, "size_y": None, "size_z": None,
+                    "r": float(color[0]) if color else None,
+                    "g": float(color[1]) if color else None,
+                    "b": float(color[2]) if color else None,
+                    "a": float(color[3]) if color and len(color) > 3 else (1.0 if color else None),
+                    "label": b.labels[i] if b.labels else None,
+                    "confidence": float(b.confidences[i]) if b.confidences else None,
+                    "annotator": "model:zdata-logger",
+                    "review_status": "pending",
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "tags": "[]",
+                }
+                self._pending_boxes.append(row)
+        else:
+            n = len(b.centers)
+            for i in range(n):
+                cx, cy, cz = b.centers[i]
+                sx, sy, sz = b.sizes[i]
+                rot = b.rotations[i] if b.rotations else [0.0, 0.0, 0.0]
+                color = b.colors[i] if b.colors else [1.0, 0.0, 0.0, 1.0]
+                row = {
+                    "annotation_id": str(uuid.uuid4()),
+                    "frame_id": f"log:{self._frame_idx}",
+                    "mcap_file": "",
+                    "mower_id": "",
+                    "x": float(cx), "y": float(cy), "z": float(cz),
+                    "roll_deg": float(rot[0]), "pitch_deg": float(rot[1]), "yaw_deg": float(rot[2]),
+                    "size_x": float(sx), "size_y": float(sy), "size_z": float(sz),
+                    "r": float(color[0]), "g": float(color[1]),
+                    "b": float(color[2]), "a": float(color[3]) if len(color) > 3 else 1.0,
+                    "label": b.labels[i] if b.labels else "object",
+                    "confidence": float(b.confidences[i]) if b.confidences else 1.0,
+                    "annotator": "model:zdata-logger",
+                    "review_status": "pending",
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "tags": "[]",
+                }
+                self._pending_boxes.append(row)
 
     def _log_scalars(self, path: str, s: Scalars, ts: int):
         for i, v in enumerate(s.values):
