@@ -84,6 +84,46 @@ class TextLog:
     level: str = "info"  # "info" | "warn" | "error"
 
 
+@dataclass
+class TimeColumn:
+    """A named timeline index for columnar data ingestion.
+
+    Mirrors Rerun's TimeColumn. Use with send_columns() for batch ingestion.
+
+    Usage:
+        zdata.send_columns(
+            "scalars",
+            indexes=[TimeColumn("step", sequence=[0, 1, 2, 3])],
+            columns={"value": [0.1, 0.2, 0.3, 0.4]},
+        )
+    """
+    timeline: str        # timeline name, e.g. "frame_nr", "timestamp", "step"
+    sequence: Optional[list[int]] = None   # integer sequence
+    timestamp_ns: Optional[list[int]] = None  # nanosecond timestamps
+    duration_s: Optional[list[float]] = None  # duration in seconds
+
+    def __post_init__(self):
+        n_specified = sum(1 for x in [self.sequence, self.timestamp_ns, self.duration_s] if x is not None)
+        if n_specified != 1:
+            raise ValueError("TimeColumn requires exactly one of: sequence, timestamp_ns, duration_s")
+
+    @property
+    def values(self) -> list:
+        if self.sequence is not None:
+            return self.sequence
+        if self.timestamp_ns is not None:
+            return self.timestamp_ns
+        return self.duration_s
+
+    @property
+    def kind(self) -> str:
+        if self.sequence is not None:
+            return "sequence"
+        if self.timestamp_ns is not None:
+            return "timestamp_ns"
+        return "duration_s"
+
+
 # ── LanceDB schemas for logged data ──────────────────────────────────
 
 def _points3d_schema() -> pa.Schema:
@@ -412,3 +452,183 @@ def query(dataset_dir: str | Path, table: str = "points3d") -> ZdataQuery:
     import lancedb
     db = lancedb.connect(str(dataset_dir))
     return ZdataQuery(db, table)
+
+
+# ── send_columns (mirrors Rerun's rr.send_columns) ───────────────────
+
+def send_columns(
+    entity_path: str,
+    indexes: list[TimeColumn],
+    columns: dict[str, list],
+    *,
+    dataset_dir: Optional[str | Path] = None,
+):
+    """Send columnar data directly to LanceDB (batch ingestion).
+
+    Mirrors Rerun's rr.send_columns(). Much faster than row-by-row zdata.log()
+    for large datasets. Accepts numpy arrays, pandas Series, or plain lists.
+
+    Usage:
+        import numpy as np
+        from zdata import send_columns, TimeColumn
+
+        times = np.arange(0, 100)
+        speeds = np.sin(times / 10.0)
+
+        # Use global logger (must call zdata.init() first)
+        send_columns(
+            "metrics/speed",
+            indexes=[TimeColumn("frame", sequence=times.tolist())],
+            columns={"value": speeds.tolist()},
+        )
+
+        # Or specify dataset_dir directly
+        send_columns(
+            "metrics/speed",
+            indexes=[TimeColumn("frame", sequence=times.tolist())],
+            columns={"value": speeds.tolist()},
+            dataset_dir="datasets/exp-001",
+        )
+    """
+    if len(indexes) != 1:
+        raise ValueError("send_columns requires exactly one TimeColumn index")
+
+    index = indexes[0]
+    n = len(index.values)
+
+    # Validate all columns have same length
+    for col_name, values in columns.items():
+        _values = values.tolist() if hasattr(values, 'tolist') else list(values)
+        if len(_values) != n:
+            raise ValueError(f"Column '{col_name}' length {len(_values)} != index length {n}")
+
+    # Determine target logger
+    if dataset_dir is not None:
+        logger = ZdataLogger(dataset_dir)
+    elif _logger is not None:
+        logger = _logger
+    else:
+        raise RuntimeError("No logger. Call zdata.init() or pass dataset_dir=")
+
+    # Build rows
+    rows = []
+    ts_kind = index.kind
+    for i in range(n):
+        row = {
+            "entity_path": entity_path,
+            "frame_idx": i,
+        }
+        if ts_kind == "sequence":
+            row["timestamp_ns"] = int(index.values[i])
+        elif ts_kind == "timestamp_ns":
+            row["timestamp_ns"] = int(index.values[i])
+        else:
+            row["timestamp_ns"] = int(index.values[i] * 1e9)
+
+        for col_name, values in columns.items():
+            _values = values.tolist() if hasattr(values, 'tolist') else list(values)
+            row[col_name] = _values[i]
+        rows.append(row)
+
+    # Auto-detect table type from entity path and columns
+    if "x" in columns and "y" in columns and "z" in columns:
+        table_name = "points3d"
+    elif "value" in columns:
+        table_name = "scalars"
+    elif "data" in columns:
+        table_name = "images"
+    else:
+        table_name = "send_columns_data"
+
+    logger._flush_table(table_name, rows, None)
+    if dataset_dir is not None:
+        logger.close()
+
+
+# ── Enhanced query: fill_latest_at / filter_range / filter_is_not_null ─
+
+class ZdataQueryEnhanced(ZdataQuery):
+    """Enhanced query with fill_latest_at, filter_range, filter_is_not_null.
+
+    Mirrors Rerun's DataFusion-backed dataframe query API.
+    """
+
+    def __init__(self, db, table: str = "points3d"):
+        super().__init__(db, table)
+        self._range_start: Optional[int] = None
+        self._range_end: Optional[int] = None
+        self._range_col: str = "timestamp_ns"
+        self._not_null_col: Optional[str] = None
+        self._fill_strategy: Optional[str] = None
+
+    def filter_range(self, start: int | float, end: int | float, *, column: str = "timestamp_ns") -> "ZdataQueryEnhanced":
+        """Filter rows within a timestamp/index range (mirrors filter_range_secs/filter_range_sequence)."""
+        self._range_start = start
+        self._range_end = end
+        self._range_col = column
+        return self
+
+    def filter_is_not_null(self, column: str) -> "ZdataQueryEnhanced":
+        """Keep only rows where a column is non-null (mirrors Rerun's filter_is_not_null)."""
+        self._not_null_col = column
+        return self
+
+    def fill_latest_at(self) -> "ZdataQueryEnhanced":
+        """Sparse-fill null values with most recent non-null value (mirrors Rerun's fill_latest_at).
+
+        Uses pandas ffill() since LanceDB doesn't natively support sparse fill.
+        For large datasets, consider chunked processing.
+        """
+        self._fill_strategy = "latest_at"
+        return self
+
+    def _to_arrow(self) -> pa.Table:
+        table = self._db.open_table(self._table_name)
+        builder = table.search()
+
+        # Apply range filter before other filters
+        if self._range_start is not None:
+            builder = builder.where(f"{self._range_col} >= {self._range_start}")
+        if self._range_end is not None:
+            builder = builder.where(f"{self._range_col} <= {self._range_end}")
+
+        for f in self._filters:
+            builder = builder.where(f)
+
+        if self._not_null_col:
+            builder = builder.where(f"{self._not_null_col} IS NOT NULL")
+
+        if self._columns:
+            builder = builder.select(self._columns)
+        if self._limit_val:
+            builder = builder.limit(self._limit_val)
+
+        result = builder.to_arrow()
+
+        # Apply fill_latest_at via pandas
+        if self._fill_strategy == "latest_at":
+            df = result.to_pandas()
+            df = df.ffill()
+            result = pa.Table.from_pandas(df)
+
+        return result
+
+
+def query_enhanced(dataset_dir: str | Path, table: str = "points3d") -> ZdataQueryEnhanced:
+    """Create an enhanced query builder with fill_latest_at, filter_range, etc.
+
+    Usage:
+        import zdata
+
+        ds = zdata.query_enhanced("my_dataset", "scalars")
+        df = (ds
+            .entity("metrics/speed")
+            .filter_range(0, 1000)
+            .filter_is_not_null("value")
+            .fill_latest_at()
+            .to_pandas()
+        )
+    """
+    import lancedb
+    db = lancedb.connect(str(dataset_dir))
+    return ZdataQueryEnhanced(db, table)

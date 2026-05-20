@@ -27,6 +27,8 @@ from .torch_dataset import ZdataDataset
 from .logger import (
     ZdataLogger,
     ZdataQuery,
+    ZdataQueryEnhanced,
+    TimeColumn,
     Points3D,
     Boxes3D,
     Scalars,
@@ -37,6 +39,8 @@ from .logger import (
     set_frame_idx,
     flush,
     query,
+    query_enhanced,
+    send_columns,
 )
 
 __all__ = [
@@ -58,6 +62,8 @@ __all__ = [
     "ZdataDataset",
     "ZdataLogger",
     "ZdataQuery",
+    "ZdataQueryEnhanced",
+    "TimeColumn",
     "Points3D",
     "Boxes3D",
     "Scalars",
@@ -68,4 +74,6 @@ __all__ = [
     "set_frame_idx",
     "flush",
     "query",
+    "query_enhanced",
+    "send_columns",
 ]
