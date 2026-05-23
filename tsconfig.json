@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "types": ["../src/worker-configuration.d.ts"]
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/scripts",
+    "src/scripts/**",
+    "src/pages",
+    "src/pages/**",
+    "src/**/*.test.ts",
+    "src/**/*.test.d.ts",
+    "node_modules",
+    "node_modules/**"
+  ]
+}

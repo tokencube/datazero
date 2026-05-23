@@ -1,0 +1,14 @@
+{
+  "name": "datazero",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DataZero — robotics data flywheel platform",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  }
+}
